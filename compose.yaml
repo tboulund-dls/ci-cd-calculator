@@ -1,0 +1,50 @@
+services:
+  web:
+    build: 
+      context: .
+      dockerfile: Web/Dockerfile
+    ports:
+      - "8000:80"
+    
+  api:
+    build: 
+      context: .
+      dockerfile: API/Dockerfile
+    ports:
+      - "8001:8080"
+    environment:
+      DATABASE_CONN_STRING: Server=mariadb;Database=calculator;Uid=calc_user;Pwd=CalcPwd;
+  
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: C@lcR00t
+      MYSQL_DATABASE: calculator
+      MYSQL_USER: calc_user
+      MYSQL_PASSWORD: CalcPwd
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+  
+  flyway:
+    image: flyway/flyway:latest
+    # We need mariadb to be running in order to migrate properly.
+    depends_on:
+      - mariadb
+    environment:
+      FLYWAY_URL: jdbc:mariadb://mariadb:3306/calculator
+      FLYWAY_USER: calc_user
+      FLYWAY_PASSWORD: CalcPwd
+      FLYWAY_CONNECT_RETRIES: 5
+      # Tells flyway that it can find the migrations in the /flyway/sql folder inside the container.
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+    # We're mapping the /db/migrations folder outside the container to the /flyway/sql folder
+    # inside the container to make the migrations available for Flyway.
+    volumes:
+      - ./db/migrations:/flyway/sql
+    # The Flyway CLI can do more than just migrations, but here we tell it to just migrate.
+    command: migrate
+    
+volumes:
+  mariadb_data:
